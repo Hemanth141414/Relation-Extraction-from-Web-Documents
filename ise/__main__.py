@@ -53,19 +53,19 @@ def main():
             relation_preds = spanbert.predict(candidate_pairs)
             for ex, pred in list(zip(candidate_pairs, relation_preds)):
                 if pred[0] == relation_map.get(r) and pred[1] > float(t):
-                    if ex["subj"][0]+ex["obj"][0] in ext_rel_map.keys():
-                        if ext_rel_map[ex["subj"][0]+ex["obj"][0]] < pred[1]:
-                            ext_rel_map[ex["subj"][0]+ex["obj"][0]] = pred[1]
-                            extracted_relations.remove({'subj':ex["subj"][0] , 'obj':ex["obj"][0] , 'confidence':pred[1]}pred[1])
-                            extracted_relations.append({'subj':ex["subj"][0] , 'obj':ex["obj"][0] , 'confidence':pred[1]})
+                    if ex["subj"][0]+"***"+ex["obj"][0] in ext_rel_map.keys():
+                        if ext_rel_map[ex["subj"][0]+"***"+ex["obj"][0]] < pred[1]:
+                            ext_rel_map[ex["subj"][0]+"***"+ex["obj"][0]] = pred[1]
                     else:
-                        ext_rel_map[ex["subj"][0]+ex["obj"][0]] = pred[1]
-                        extracted_relations.append({'subj':ex["subj"][0] , 'obj':ex["obj"][0] , 'confidence':pred[1]})
+                        ext_rel_map[ex["subj"][0]+"***"+ex["obj"][0]] = pred[1]
 
         print("sentence count is:", count)
         print("\n" )
-    extracted_relations.sort(key=myfunc)
-    print(ext_rel_map)
+    for i in ext_rel_map.keys():
+        val = ext_rel_map[i]
+        a = i.split("***")
+        extracted_relations.append({'subj':a[0] , 'obj':a[1] , 'confidence':val})
+    extracted_relations.sort(reverse=True, key=myfunc)
     for i in extracted_relations:
         print(i)
         print("\n")
