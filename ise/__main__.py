@@ -21,16 +21,19 @@ from googleapiclient.discovery import build
 from config import DEVELOPER_KEY, SEARCH_ENGINE_ID
 
 def main():
-    spanbert = SpanBERT("./pretrained_spanbert") 
+    spanbert = SpanBERT("./pretrained_spanbert")
+    #relations
     relation_map = {"1":"per:schools_attended", "2":"per:employee_of", "3":"per:cities_of_residence", "4":"org:top_members/employees"}
     #entities_of_interest = ["ORGANIZATION", "PERSON"]
-    objects_map = {"1":["ORGANIZATION"], "2":["ORGANIZATION"], "3":["LOCATION", "CITY", "STATE_OR_PROVINCE", "COUNTRY"], "4":["PERSON"]}
+   #entities to extract
+   objects_map = {"1":["ORGANIZATION"], "2":["ORGANIZATION"], "3":["LOCATION", "CITY", "STATE_OR_PROVINCE", "COUNTRY"], "4":["PERSON"]}
     subjects_map = {"1":["PERSON"], "2":["PERSON"], "3":["PERSON"], "4":["ORGANIZATION"]}
     r = sys.argv[1]
     t = sys.argv[2]
     q = sys.argv[3]
     k = sys.argv[4]
     entities_of_interest = []
+    #entities we want to extract
     entities_of_interest = subjects_map.get(r) + objects_map.get(r)
     print(entities_of_interest)
     extracted_relations = []
@@ -47,23 +50,28 @@ def main():
                 print("Skipping this url as this appeared in previous iterations")
             print(i['url'])
             urls.append(i['url'])
+            #Load spacy model
             nlp = spacy.load("en_core_web_lg")
+            #Apply spacy to raw text
             doc = nlp(i["content"])
             print("\n")
             count = 0
             for sentence in doc.sents:
                 count = count + 1
                 candidate_pairs = []
+                #Create entity pairs
                 sentence_entity_pairs = create_entity_pairs(sentence, entities_of_interest)
                 for ep in sentence_entity_pairs:
                     candidate_pairs.append({"tokens": ep[0], "subj": ep[1], "obj": ep[2]})  # e1=Subject, e2=Object
                     candidate_pairs.append({"tokens": ep[0], "subj": ep[2], "obj": ep[1]})  # e1=Object, e2=Subject
                 neith_sub = objects_map.get(r)
                 neith_obj = subjects_map.get(r)
+                #Classify Relations for all candidate entity pair for SpanBERT
                 candidate_pairs = [p for p in candidate_pairs if not p["subj"][1] in neith_sub]
                 candidate_pairs = [p for p in candidate_pairs if not p["obj"][1] in neith_obj]
                 if len(candidate_pairs) == 0:
                     continue
+                #Get predictions:list of (relation,confidence) pairs
                 relation_preds = spanbert.predict(candidate_pairs)
                 for ex, pred in list(zip(candidate_pairs, relation_preds)):
                     if pred[0] == relation_map.get(r) and pred[1] > float(t):
@@ -84,6 +92,7 @@ def main():
         val = ext_rel_map[i]
         a = i.split("***")
         extracted_relations.append({'subj':a[0] , 'obj':a[1] , 'confidence':val})
+    #Extracted Relations and print them    
     extracted_relations.sort(reverse=True, key=myfunc)
     for i in extracted_relations:
         print(i)
@@ -92,7 +101,7 @@ def main():
 def myfunc(e):
     return e["confidence"]
 
-
+#Retriving google results forquery
 def googleQueryAPI(query):
     service = build("customsearch", "v1", developerKey=DEVELOPER_KEY)
     res = service.cse().list(
@@ -105,7 +114,8 @@ def googleQueryAPI(query):
         return rfmat
     else:
         return []
-       
+
+#Getting the content of the urls
 def addContent(query, documents):
     for doc in documents:
         text = ""
@@ -113,7 +123,7 @@ def addContent(query, documents):
         if(url.find("pdf")==-1):
             try:
                 res = client.Request(url, data=None, headers = {'User-Agent' : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.60 Safari/537.36"})
-               
+                #retrive contents of url
                 html_page = client.urlopen(res, timeout=30).read()
                 #page = requests.get(url=url)
                 textBeautify = BeautifulSoup(html_page, 'html5lib')
@@ -124,6 +134,7 @@ def addContent(query, documents):
                 txt = re.sub(r'\([^()]*\)', ' ', txt)
                 txt.replace(". ", ".").replace(".", ". ")
                 if txt:
+                    #return the first 20000 characters of extracted web content
                     text = "".join(txt)
                     if len(text) > 20000:
                         text = text[:20000]
