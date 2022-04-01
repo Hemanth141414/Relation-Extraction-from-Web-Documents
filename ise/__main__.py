@@ -30,9 +30,15 @@ def main():
     t = sys.argv[2]
     q = sys.argv[3]
     k = sys.argv[4]
+    print("______")
+    print("Parameters: ")
+    print("client key: " +DEVELOPER_KEY)
+    print("Engine key: " + SEARCH_ENGINE_ID)
+    print("relation: " + relation_map.get(r))
+    print("Threahold: "+ t)
+    print("Query: " + q)
     entities_of_interest = []
     entities_of_interest = subjects_map.get(r) + objects_map.get(r)
-    print(entities_of_interest)
     extracted_relations = []
     ext_rel_map = {}
     urls = []
@@ -40,17 +46,20 @@ def main():
     while(len(ext_rel_map.keys())<float(k)):
         iter_count = iter_count + 1
         print("Current Iteration: ", iter_count)
+        print("query being processed is : " + q)
         googleResults = googleQueryAPI(q)
         addContent(q, googleResults)
+        u_count = 1
         for i in googleResults:
             if i['url'] in urls:
                 print("Skipping this url as this appeared in previous iterations")
-            print(i['url'])
+            print(str(u_count)+"."+i['url'])
+            u_count = u_count + 1
             urls.append(i['url'])
             nlp = spacy.load("en_core_web_lg")
             doc = nlp(i["content"])
-            print("\n")
             count = 0
+            print("Processing sentences \n")
             for sentence in doc.sents:
                 count = count + 1
                 candidate_pairs = []
@@ -70,24 +79,37 @@ def main():
                         if ex["subj"][0]+"***"+ex["obj"][0] in ext_rel_map.keys():
                             if ext_rel_map[ex["subj"][0]+"***"+ex["obj"][0]] < pred[1]:
                                 ext_rel_map[ex["subj"][0]+"***"+ex["obj"][0]] = pred[1]
+                                print("Duplicate relation exists, replacing the one with higher confidence \n")
+                                print("subject: " + ex["subj"][0] + "\t Object: " +ex["obj"][0]+ "\t confidence: " + str(pred[1]))
                         else:
                             ext_rel_map[ex["subj"][0]+"***"+ex["obj"][0]] = pred[1]
+                            print("\t ===== Extracted Relation =====")
+                            print(ex["tokens"])
+                            print("subject: " + ex["subj"][0] + "\t Object: " +ex["obj"][0]+ "\t confidence: " +str(pred[1]))
+                            print("\n")
 
-            print("sentence count is:", count)
+            print("total sentences processed:", count)
             print("\n" )
         dict(sorted(ext_rel_map.items(), key=lambda item: item[1], reverse=True))    
         print(ext_rel_map)
         ite = list(ext_rel_map.items())
         qps = ite[0][0].split("***") 
         q = qps[0] + " " + qps[1]
+        if(len(ext_rel_map.keys())<float(k)):
+            print("Preparing for second iteration as total relations are less than required.\n")
+            print("total extracted relations: ", len(ext_rel_map.keys()))
+            print("Required no. of tuples: ", float(k))
+            print("\n")
     for i in ext_rel_map.keys():
         val = ext_rel_map[i]
         a = i.split("***")
         extracted_relations.append({'subj':a[0] , 'obj':a[1] , 'confidence':val})
     extracted_relations.sort(reverse=True, key=myfunc)
+    print("Final extracted relations are: \n")
+    print("======================= All Relations for " +relation_map.get(r)+ "===============================")
     for i in extracted_relations:
         print(i)
-        print("\n")
+    print("Total iterations = ", iter_count)    
 
 def myfunc(e):
     return e["confidence"]
