@@ -22,8 +22,10 @@ from config import DEVELOPER_KEY, SEARCH_ENGINE_ID
 
 def main():
     spanbert = SpanBERT("./pretrained_spanbert") 
+    #relations
     relation_map = {"1":"per:schools_attended", "2":"per:employee_of", "3":"per:cities_of_residence", "4":"org:top_members/employees"}
     #entities_of_interest = ["ORGANIZATION", "PERSON"]
+    #Entities to extract
     objects_map = {"1":["ORGANIZATION"], "2":["ORGANIZATION"], "3":["LOCATION", "CITY", "STATE_OR_PROVINCE", "COUNTRY"], "4":["PERSON"]}
     subjects_map = {"1":["PERSON"], "2":["PERSON"], "3":["PERSON"], "4":["ORGANIZATION"]}
     r = sys.argv[1]
@@ -37,6 +39,7 @@ def main():
     print("relation: " + relation_map.get(r))
     print("Threahold: "+ t)
     print("Query: " + q)
+    #Entities we want to extract
     entities_of_interest = []
     entities_of_interest = subjects_map.get(r) + objects_map.get(r)
     extracted_relations = []
@@ -59,8 +62,11 @@ def main():
                 print("Webpage length (num characters):" + str(i['text_size']))
             else:
                 print("Trimming webpage content from " + str(i['text_size']) + " to 20000 characters")
+            
             urls.append(i['url'])
+            #Load spacy model
             nlp = spacy.load("en_core_web_lg")
+            #Apply Spacy to raw text
             doc = nlp(i["content"])
             count = 0
             print("Processing sentences \n")
@@ -68,16 +74,19 @@ def main():
             for sentence in doc.sents:
                 count = count + 1
                 candidate_pairs = []
+                #Create entity pairs
                 sentence_entity_pairs = create_entity_pairs(sentence, entities_of_interest)
                 for ep in sentence_entity_pairs:
                     candidate_pairs.append({"tokens": ep[0], "subj": ep[1], "obj": ep[2]})  # e1=Subject, e2=Object
                     candidate_pairs.append({"tokens": ep[0], "subj": ep[2], "obj": ep[1]})  # e1=Object, e2=Subject
                 neith_sub = objects_map.get(r)
                 neith_obj = subjects_map.get(r)
+                #Classify Relations for all candidate entity pair for SpanBERT
                 candidate_pairs = [p for p in candidate_pairs if not p["subj"][1] in neith_sub]
                 candidate_pairs = [p for p in candidate_pairs if not p["obj"][1] in neith_obj]
                 if len(candidate_pairs) == 0:
                     continue
+                #Get predictions: list of(relation,confidence) pairs
                 relation_preds = spanbert.predict(candidate_pairs)
                 for ex, pred in list(zip(candidate_pairs, relation_preds)):
                     if pred[0] == relation_map.get(r) and pred[1] > float(t):
@@ -87,6 +96,7 @@ def main():
                                 print("Duplicate relation exists, replacing the one with higher confidence \n")
                                 print("subject: " + ex["subj"][0] + "\t Object: " +ex["obj"][0]+ "\t confidence: " + str(pred[1]))
                         else:
+                            #Extracted realtions and tokens
                             ext_rel_map[ex["subj"][0]+"***"+ex["obj"][0]] = pred[1]
                             rel_count = rel_count + 1
                             print("\t ===== Extracted Relation =====")
@@ -125,7 +135,7 @@ def main():
 def myfunc(e):
     return e["confidence"]
 
-
+#Retriving google results for query
 def googleQueryAPI(query):
     service = build("customsearch", "v1", developerKey=DEVELOPER_KEY)
     res = service.cse().list(
@@ -138,7 +148,7 @@ def googleQueryAPI(query):
         return rfmat
     else:
         return []
-       
+#Getting content of url       
 def addContent(query, documents):
     for doc in documents:
         text = ""
@@ -158,6 +168,7 @@ def addContent(query, documents):
                 txt = re.sub(r'\([^()]*\)', ' ', txt)
                 txt.replace(". ", ".").replace(".", ". ")
                 if txt:
+                    #Return first 20000 characters of extracted web content
                     text = "".join(txt)
                     txt_size = len(text)
                     if len(text) > 20000:
