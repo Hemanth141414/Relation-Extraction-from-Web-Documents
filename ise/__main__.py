@@ -55,11 +55,16 @@ def main():
                 print("Skipping this url as this appeared in previous iterations")
             print(str(u_count)+"."+i['url'])
             u_count = u_count + 1
+            if len(i['content']) == i['text_size']:
+                print("Webpage length (num characters):" + str(i['text_size']))
+            else:
+                print("Trimming webpage content from " + str(i['text_size']) + " to 20000 characters")
             urls.append(i['url'])
             nlp = spacy.load("en_core_web_lg")
             doc = nlp(i["content"])
             count = 0
             print("Processing sentences \n")
+            rel_count = 0
             for sentence in doc.sents:
                 count = count + 1
                 candidate_pairs = []
@@ -83,15 +88,21 @@ def main():
                                 print("subject: " + ex["subj"][0] + "\t Object: " +ex["obj"][0]+ "\t confidence: " + str(pred[1]))
                         else:
                             ext_rel_map[ex["subj"][0]+"***"+ex["obj"][0]] = pred[1]
+                            rel_count = rel_count + 1
                             print("\t ===== Extracted Relation =====")
                             print(ex["tokens"])
                             print("subject: " + ex["subj"][0] + "\t Object: " +ex["obj"][0]+ "\t confidence: " +str(pred[1]))
                             print("\n")
+                    
+                    else:
+                        print("\t ===== Extracted Relation =====")
+                        print(ex["tokens"])
+                        print("Confidence is lower than threshold. Ignoring this \n")
 
             print("total sentences processed:", count)
+            print("Realtions extracted from this website: " + str(rel_count))
             print("\n" )
         dict(sorted(ext_rel_map.items(), key=lambda item: item[1], reverse=True))    
-        print(ext_rel_map)
         ite = list(ext_rel_map.items())
         qps = ite[0][0].split("***") 
         q = qps[0] + " " + qps[1]
@@ -103,10 +114,10 @@ def main():
     for i in ext_rel_map.keys():
         val = ext_rel_map[i]
         a = i.split("***")
-        extracted_relations.append({'subj':a[0] , 'obj':a[1] , 'confidence':val})
+        extracted_relations.append({'subject':a[0] , 'object':a[1] , 'confidence':val})
     extracted_relations.sort(reverse=True, key=myfunc)
     print("Final extracted relations are: \n")
-    print("======================= All Relations for " +relation_map.get(r)+ "===============================")
+    print("======================= All Relations for " +relation_map.get(r)+ ": " +str(len(extracted_relations)) +" ===============================")
     for i in extracted_relations:
         print(i)
     print("Total iterations = ", iter_count)    
@@ -133,6 +144,7 @@ def addContent(query, documents):
         text = ""
         url = doc['url']
         if(url.find("pdf")==-1):
+            txt_size = 0
             try:
                 res = client.Request(url, data=None, headers = {'User-Agent' : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.60 Safari/537.36"})
                
@@ -147,12 +159,14 @@ def addContent(query, documents):
                 txt.replace(". ", ".").replace(".", ". ")
                 if txt:
                     text = "".join(txt)
+                    txt_size = len(text)
                     if len(text) > 20000:
                         text = text[:20000]
                 else:
                     text = ""
             except (socket.timeout, http.client.RemoteDisconnected, http.client.IncompleteRead, urllib.error.URLError, ssl.CertificateError):
                 text = ""
+        doc.update({'text_size': txt_size})       
         doc.update({'content': text})
 
        
