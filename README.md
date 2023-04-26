@@ -82,6 +82,3 @@ Output is a list of the same length as the input list, which contains the SpanBE
 print("Output: ", preds)
 # Output: [('per:employee_of', 0.99), ('org:top_members/employees', 0.98), ('per:schools_attended', 0.98)]
 ```
-
-## Contact
-If you have any questions, please contact Giannis Karamanolakis `<gkaraman@cs.columbia.edu>`.
